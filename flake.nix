@@ -75,7 +75,7 @@
           binaryen
           wasm-pack
           nodejs
-          sass
+          nodePackages.sass
         ];
       };
     }); 
