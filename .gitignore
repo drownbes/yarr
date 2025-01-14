@@ -1,6 +1,7 @@
 /target/
 **/*.rs.bk
 Cargo.lock
+.sass-cache
 
 
 # Added by cargo

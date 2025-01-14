@@ -14,7 +14,11 @@
           beef_market = self.packages.${system}.beef_market;
       };
       pkgs = nixpkgs.legacyPackages.${system}.extend overlay;
-      toolchain = fenix.packages.${system}.stable.completeToolchain; 
+      toolchain = with fenix.packages.${system}; combine [
+        stable.completeToolchain
+        targets.wasm32-unknown-unknown.stable.rust-std
+      ];
+
       rustPlatform = (pkgs.makeRustPlatform {
         cargo = toolchain;
         rustc = toolchain;
@@ -66,6 +70,12 @@
           sqlite-vec
           litecli
           openapi-generator-cli
+          cargo-leptos
+          cargo-generate
+          binaryen
+          wasm-pack
+          nodejs
+          sass
         ];
       };
     }); 
