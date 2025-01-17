@@ -2,6 +2,7 @@
 **/*.rs.bk
 Cargo.lock
 .sass-cache
+data
 
 
 # Added by cargo

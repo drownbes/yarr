@@ -6,9 +6,14 @@
     };
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "nixpkgs/nixos-unstable";
+    process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
+    services-flake.url = "github:juspay/services-flake";
   };
 
-  outputs = { self, fenix, flake-utils, nixpkgs }: 
+  outputs = inputs@{ self, fenix, flake-utils, nixpkgs,
+    process-compose-flake,
+    services-flake
+    }: 
     flake-utils.lib.eachDefaultSystem (system: let
       overlay = final: prev: {
           beef_market = self.packages.${system}.beef_market;
@@ -18,6 +23,18 @@
         stable.completeToolchain
         targets.wasm32-unknown-unknown.stable.rust-std
       ];
+
+      pcs = import process-compose-flake.lib {inherit pkgs;};
+      services = pcs.evalModules {
+        modules = [
+          services-flake.processComposeModules.default
+          (inputs.services-flake.lib.multiService ./prowlarr.nix)
+          {
+            cli.options.port = 8084;
+            services.prowlarr."prowlarr".enable = true;
+          }
+        ];
+      };
 
       rustPlatform = (pkgs.makeRustPlatform {
         cargo = toolchain;
@@ -47,7 +64,7 @@
     in {
 
       packages = {
-        inherit prowarrApiSrc;
+        inherit prowarrApiSrc services;
       };
       
 
@@ -59,7 +76,11 @@
         nativeBuildInputs = [
             pkgs.pkg-config
         ];
+        inputsFrom = [
+          services.config.services.outputs.devShell
+        ];
         buildInputs = with pkgs;[
+          services.config.outputs.package
           prowarrApiSrc
           toolchain
           just
@@ -76,7 +97,8 @@
           wasm-pack
           nodejs
           nodePackages.sass
+          prowlarr
         ];
       };
-    }); 
+    } // {inherit pcs;}); 
 }
