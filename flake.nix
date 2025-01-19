@@ -29,9 +29,11 @@
         modules = [
           services-flake.processComposeModules.default
           (inputs.services-flake.lib.multiService ./prowlarr.nix)
+          (inputs.services-flake.lib.multiService ./transmission.nix)
           {
             cli.options.port = 8084;
             services.prowlarr."prowlarr".enable = true;
+            services.transmission."transmission".enable = true;
           }
         ];
       };
@@ -98,6 +100,7 @@
           nodejs
           nodePackages.sass
           prowlarr
+          transmission_4
         ];
       };
     } // {inherit pcs;}); 
