@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use reqwest::cookie::CookieStore;
 use reqwest_cookie_store::CookieStoreMutex;
+use scraper::{selectable::Selectable, Html, Selector};
 //https://rutracker.net/forum/login.php
 //
 use secrecy::{ExposeSecret, SecretString};
-
 
 
 
@@ -56,8 +57,8 @@ impl RuTrackerProvider {
             
         })
     }
-    
-    pub async fn is_logged(&self) -> anyhow::Result<bool> {
+
+    pub async fn is_session_active(&self) -> anyhow::Result<bool> {
         let store = self.cookie_store.lock().unwrap();
         for c in store.iter_any() {
             println!("{:?}", c);
@@ -65,6 +66,12 @@ impl RuTrackerProvider {
 
         let session_cookie = store.get("rutracker.net", "/forum/", "bb_session");
         Ok(session_cookie.is_some())
+    }
+
+    pub async fn is_logged(html: String) -> anyhow::Result<bool> {
+        let document = Html::parse_document(&html);
+        let is_logged_sel = Selector::parse("#logged-in-username").expect("Invalid selector");
+        Ok(document.select(&is_logged_sel).next().is_some())
     }
 
     fn login_path(&self) -> String {
@@ -75,35 +82,30 @@ impl RuTrackerProvider {
         format!("{}{}", self.config.base_url, self.config.search_path)
     }
 
+
     pub async fn login(&mut self) -> anyhow::Result<()> {
         let req = LoginReq {
             login_username: self.config.login.expose_secret().to_string(),
             login_password: self.config.password.expose_secret().to_string(),
             login: "вход".to_string()
         };
-        let res = self.client
+        let _res = self.client
             .post(self.login_path())
             .form(&req)
             .send()
             .await?;
 
-        dbg!(res.text().await?);
-
-
         Ok(())
-
-        //if res.status() == reqwest::StatusCode::FOUND {
-        //    Ok(())
-        //} else {
-        //    bail!("Failed to login")
-        //}
     }
 
     pub async fn search(&self, query: String, categories: Vec<u64>) -> anyhow::Result<()> {
         let cs : String = categories.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",");
-        let req = [
+        let mut req = vec![
             ("nm", query)
         ];
+        if !cs.is_empty() {
+            req.push(("f", cs));
+        }
 
         let res = self.client.get(self.search_path())
             .query(&req)

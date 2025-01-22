@@ -93,13 +93,8 @@
           sqlite-vec
           litecli
           openapi-generator-cli
-          cargo-leptos
-          cargo-generate
-          binaryen
-          wasm-pack
           nodejs
           nodePackages.sass
-          prowlarr
           transmission_4
         ];
       };

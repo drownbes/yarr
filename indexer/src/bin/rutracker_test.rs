@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
     rt.login().await?;
 
 
-    if rt.is_logged().await? {
+    if rt.is_session_active().await? {
         println!("Logged in");
     }
 
