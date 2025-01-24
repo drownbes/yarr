@@ -5,6 +5,8 @@ Cargo.lock
 data
 .env*
 
+db.db*
+
 # Added by cargo
 
 /target

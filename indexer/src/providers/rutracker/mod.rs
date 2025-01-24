@@ -1,12 +1,14 @@
-use std::sync::Arc;
+use std::{io::BufReader, sync::Arc};
 
 use anyhow::anyhow;
-use reqwest::cookie::CookieStore;
-use reqwest_cookie_store::CookieStoreMutex;
+use reqwest_cookie_store::{CookieStoreMutex, CookieStore};
 use scraper::{selectable::Selectable, Html, Selector};
 //https://rutracker.net/forum/login.php
 //
 use secrecy::{ExposeSecret, SecretString};
+use tokio::sync::Mutex;
+
+use crate::repos::cookies_repo::CookiesRepo;
 
 
 
@@ -16,6 +18,7 @@ pub struct RuTrackerConfig {
     pub base_url: String,
     pub login_path: String,
     pub search_path: String,
+    pub provider_id: String
 }
 
 
@@ -23,7 +26,7 @@ pub struct RuTrackerProvider {
     cookie_store: Arc<CookieStoreMutex>,
     client: reqwest::Client,
     config: RuTrackerConfig,
-    is_logged: bool
+    cookie_repo: Arc<Mutex<CookiesRepo>>,
 }
 
 #[derive(serde::Serialize, Debug)]
@@ -41,19 +44,28 @@ struct SearchReq {
 
 
 impl RuTrackerProvider {
-    pub fn new(config: RuTrackerConfig) -> anyhow::Result<RuTrackerProvider> {
-        let cookie_store = reqwest_cookie_store::CookieStoreMutex::new(
-            reqwest_cookie_store::CookieStore::new(None)
-        );
-        let cookie_store = std::sync::Arc::new(cookie_store);
+    pub async fn new(config: RuTrackerConfig, cookie_repo: Arc<Mutex<CookiesRepo>>) -> anyhow::Result<RuTrackerProvider> {
+        let pi = config.provider_id.clone();
+        let res = cookie_repo.lock().await.get(&pi).await?;
+
+        let cookie_store = match res {
+            Some(cookie) => { 
+                dbg!("Stored cookie {}", &cookie);
+                reqwest_cookie_store::CookieStore::load_json(cookie.as_bytes()).unwrap()
+            }
+            None => reqwest_cookie_store::CookieStore::new(None)
+        };
+
+        let cookie_store = std::sync::Arc::new(CookieStoreMutex::new(cookie_store));
+
         let client = reqwest::ClientBuilder::new()
             .cookie_provider(cookie_store.clone())
             .build()?;
         Ok(RuTrackerProvider {
+            cookie_repo,
             cookie_store,
             client,
-            config,
-            is_logged: false
+            config
             
         })
     }
@@ -82,8 +94,25 @@ impl RuTrackerProvider {
         format!("{}{}", self.config.base_url, self.config.search_path)
     }
 
+    async fn persist_cookies(&self) -> anyhow::Result<()> {
+        let mut buf = vec![];
+        let cookie_str = {
+            let store = self.cookie_store.lock().unwrap();
+            store.save_json(&mut buf).expect("Failed to save cookie");
+            String::from_utf8(buf)
+        }?;
+        dbg!("cookie to write");
+        dbg!(&cookie_str);
+        self.cookie_repo.lock().await.insert(&self.config.provider_id, cookie_str).await?;
+        Ok(())
+    }
 
     pub async fn login(&mut self) -> anyhow::Result<()> {
+        if let Ok(true) = self.is_session_active().await {
+            dbg!("Already logged in");
+            return Ok(())
+        }
+     
         let req = LoginReq {
             login_username: self.config.login.expose_secret().to_string(),
             login_password: self.config.password.expose_secret().to_string(),
@@ -94,6 +123,8 @@ impl RuTrackerProvider {
             .form(&req)
             .send()
             .await?;
+
+        self.persist_cookies().await?;
 
         Ok(())
     }

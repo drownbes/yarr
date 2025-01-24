@@ -1,12 +1,7 @@
 -- Add migration script here
 CREATE TABLE providers (
-  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  name TEXT UNIQUE
+  id TEXT PRIMARY KEY NOT NULL,
+  cookie TEXT
 );
 
-CREATE TABLE cookies (
-  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  provider_id INTEGER NOT NULL,
-  cookie TEXT,
-  FOREIGN KEY(provider_id) REFERENCES providers(id),
-);
+insert into providers(id) values ("rutracker");

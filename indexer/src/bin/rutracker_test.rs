@@ -1,10 +1,19 @@
 use std::env;
+use std::sync::Arc;
 
 use indexer::providers::rutracker::{RuTrackerConfig, RuTrackerProvider};
+use indexer::repos::create_sqlite_pool;
+use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::from_filename(".env.local")?;
+
+    let pool = create_sqlite_pool("sqlite://db.db").await?;
+
+    let cookie_repo = indexer::repos::cookies_repo::CookiesRepo::new(pool.clone());
+
+    let cookie_repo = Arc::new(Mutex::new(cookie_repo));
 
     let rt_config = RuTrackerConfig {
         login: env::var("RUTRACKER_LOGIN")?.into(),
@@ -12,9 +21,10 @@ async fn main() -> anyhow::Result<()> {
         base_url: env::var("RUTRACKER_BASEURL")?,
         login_path: env::var("RUTRACKER_LOGIN_PATH")?,
         search_path: env::var("RUTRACKER_SEARCH_PATH")?,
+        provider_id: "rutracker".to_string()
     };
 
-    let mut rt = RuTrackerProvider::new(rt_config)?;
+    let mut rt = RuTrackerProvider::new(rt_config, cookie_repo).await?;
 
     rt.login().await?;
 
