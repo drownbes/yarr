@@ -1,8 +1,11 @@
 use std::{io::BufReader, sync::Arc};
 
+mod search_result_page;
+
 use anyhow::anyhow;
 use reqwest_cookie_store::{CookieStoreMutex, CookieStore};
 use scraper::{element_ref::Select, selectable::Selectable, ElementRef, Html, Selector};
+use search_result_page::SearchResultPage;
 //https://rutracker.net/forum/login.php
 //
 use secrecy::{ExposeSecret, SecretString};
@@ -150,10 +153,10 @@ impl RuTrackerProvider {
             .text()
             .await?;
 
-        let mut pages : Vec<RuTrackerSearchResultHtml> = vec![];
+        let mut pages : Vec<SearchResultPage> = vec![];
 
-        let page = RuTrackerSearchResultHtml::new(&res);
-        let mut next_url = page.get_next_page_url().map(|u| self.prepend_base_url(&u));
+        let page = SearchResultPage::new(&res);
+        let mut next_url = page.get_next_page_href().map(|u| self.prepend_base_url(&u));
             
         dbg!(&next_url);
 
@@ -166,53 +169,11 @@ impl RuTrackerProvider {
                 .await?
                 .text()
                 .await?;
-            let p = RuTrackerSearchResultHtml::new(&html);
-            next_url = p.get_next_page_url().map(|u| self.prepend_base_url(&u));
+            let p = SearchResultPage::new(&html);
+            next_url = p.get_next_page_href().map(|u| self.prepend_base_url(&u));
             pages.push(p);
         }
 
         Ok(())
     }
 }
-
-
-struct RuTrackerSearchResultHtml {
-    document: Html
-}
-
-impl RuTrackerSearchResultHtml {
-   fn new(html_str: &str) -> RuTrackerSearchResultHtml {
-        RuTrackerSearchResultHtml {
-            document: Html::parse_document(html_str)
-        }
-   }
-
-    fn get_next_page_url(&self) -> Option<String> {
-        let next_btn_sel = Selector::parse(".nav a.pg").expect("Invalid selector");
-        let a_el = self.document.select(&next_btn_sel).last()?;
-        if a_el.text().next()? != "След." {
-            return None
-        }
-        let href = a_el.value().attr("href")?.to_owned();
-        Some(href)
-    }
-
-    fn search_result_rows(&self) -> Vec<ResultRow> {
-        let rows_sel = Selector::parse("tr.hl-tr").expect("Invalid selector");
-        self.document.select(&rows_sel).map(ResultRow::new).collect()
-    }
-}
-
-struct ResultRow<'a> {
-    el: ElementRef<'a>
-}
-
-impl<'a> ResultRow<'a> {
-    fn new(el: ElementRef<'a>) -> ResultRow<'a> {
-        ResultRow {
-            el
-        }
-    }
-}
-
-
