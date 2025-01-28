@@ -1,12 +1,10 @@
 pub struct CookiesRepo {
-    pool: sqlx::SqlitePool
+    pool: sqlx::SqlitePool,
 }
 
 impl CookiesRepo {
     pub fn new(pool: sqlx::SqlitePool) -> CookiesRepo {
-        CookiesRepo {
-            pool
-        }
+        CookiesRepo { pool }
     }
 
     pub async fn insert(&self, provider_id: &str, cookie: String) -> anyhow::Result<()> {
@@ -33,5 +31,4 @@ impl CookiesRepo {
         .await?;
         Ok(cookie)
     }
-
 }

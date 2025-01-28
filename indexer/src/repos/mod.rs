@@ -1,4 +1,4 @@
-pub mod cookies_repo; 
+pub mod cookies_repo;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::{Pool, Sqlite};
@@ -18,4 +18,3 @@ pub async fn create_sqlite_pool(conn_str: &str) -> sqlx::Result<Pool<Sqlite>> {
 
     Ok(pool)
 }
-

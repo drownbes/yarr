@@ -3,14 +3,13 @@ use std::path::Path;
 #[derive(serde::Deserialize, Clone, Debug)]
 pub struct AppConfig {
     pub app: App,
-    pub db: Db
+    pub db: Db,
 }
-
 
 #[derive(serde::Deserialize, Clone, Debug)]
 pub struct App {
     pub host: String,
-    pub port: u16
+    pub port: u16,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]

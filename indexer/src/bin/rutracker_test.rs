@@ -1,7 +1,7 @@
 use std::env;
 use std::sync::Arc;
 
-use indexer::providers::rutracker::{RuTrackerConfig, RuTrackerProvider};
+use indexer::providers::rutracker::client::{RuTrackerClient, RuTrackerConfig};
 use indexer::repos::create_sqlite_pool;
 use tokio::sync::Mutex;
 
@@ -21,20 +21,19 @@ async fn main() -> anyhow::Result<()> {
         base_url: env::var("RUTRACKER_BASEURL")?,
         login_path: env::var("RUTRACKER_LOGIN_PATH")?,
         search_path: env::var("RUTRACKER_SEARCH_PATH")?,
-        provider_id: "rutracker".to_string()
+        index_path: env::var("RUTRACKER_INDEX_PATH")?,
+        provider_id: "rutracker".to_string(),
     };
 
-    let mut rt = RuTrackerProvider::new(rt_config, cookie_repo).await?;
+    let mut rt = RuTrackerClient::new(rt_config, cookie_repo).await?;
 
     rt.login().await?;
-
 
     if rt.is_session_active().await? {
         println!("Logged in");
     }
 
     rt.search("Game of thrones".into(), vec![]).await?;
-
 
     Ok(())
 }

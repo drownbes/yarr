@@ -1,8 +1,8 @@
-pub mod rutracker;
 mod kinozaltv;
+pub mod rutracker;
+mod select_utils;
 
 use std::future::Future;
-
 
 struct SearchResult;
 struct CategoriesResult;
