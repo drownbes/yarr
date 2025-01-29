@@ -1,2 +1,5 @@
 pub mod client;
-mod html_pages;
+pub mod pages;
+
+#[cfg(test)]
+pub mod test_helpers;

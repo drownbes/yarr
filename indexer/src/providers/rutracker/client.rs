@@ -1,11 +1,15 @@
-use super::html_pages::{AnyPage, SearchResultPage};
 use reqwest_cookie_store::CookieStoreMutex;
 use secrecy::{ExposeSecret, SecretString};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use crate::repos::cookies_repo::CookiesRepo;
+use crate::{
+    providers::rutracker::pages::search_results_page::SearchResultPage,
+    repos::cookies_repo::CookiesRepo,
+};
+
+use super::pages::index_page::IndexPage;
 
 pub struct RuTrackerConfig {
     pub login: SecretString,
@@ -81,7 +85,7 @@ impl RuTrackerClient {
             .await?
             .text()
             .await?;
-        AnyPage::new(&res).is_logged()
+        IndexPage::new(&res).is_logged()
     }
 
     fn login_path(&self) -> String {
