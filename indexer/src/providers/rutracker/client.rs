@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use reqwest_cookie_store::CookieStoreMutex;
 use secrecy::{ExposeSecret, SecretString};
 use std::sync::Arc;
@@ -9,7 +10,10 @@ use crate::{
     repos::cookies_repo::CookiesRepo,
 };
 
-use super::pages::index_page::IndexPage;
+use super::pages::{
+    files_tree_page::{FileOrDir, FilesTreePage},
+    index_page::IndexPage,
+};
 
 pub struct RuTrackerConfig {
     pub login: SecretString,
@@ -19,6 +23,7 @@ pub struct RuTrackerConfig {
     pub search_path: String,
     pub index_path: String,
     pub provider_id: String,
+    pub topic_path: String,
 }
 
 pub struct RuTrackerClient {
@@ -26,6 +31,7 @@ pub struct RuTrackerClient {
     client: reqwest::Client,
     config: RuTrackerConfig,
     cookie_repo: Arc<Mutex<CookiesRepo>>,
+    form_token: Option<String>,
 }
 
 #[derive(serde::Serialize, Debug)]
@@ -64,6 +70,7 @@ impl RuTrackerClient {
             cookie_store,
             client,
             config,
+            form_token: None,
         })
     }
 
@@ -97,6 +104,14 @@ impl RuTrackerClient {
     }
     fn index_path(&self) -> String {
         format!("{}{}", self.config.base_url, self.config.index_path)
+    }
+
+    fn topic_path(&self) -> String {
+        format!("{}{}", self.config.base_url, self.config.topic_path)
+    }
+
+    fn download_path(&self) -> String {
+        format!("{}{}", self.config.base_url, "/forum/dl.php")
     }
 
     async fn persist_cookies(&self) -> anyhow::Result<()> {
@@ -178,5 +193,35 @@ impl RuTrackerClient {
         }
 
         Ok(())
+    }
+
+    pub async fn topic_files(&self, id: i64) -> anyhow::Result<Option<Vec<FileOrDir>>> {
+        let req = [("t", format!("{}", id))];
+        let _res = self
+            .client
+            .post(self.topic_path())
+            .form(&req)
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        let p = FilesTreePage::new(&_res);
+        Ok(p.get_files())
+    }
+
+    pub async fn torrent_file(&self, id: i64) -> anyhow::Result<String> {
+        let form_token = self.form_token.clone().ok_or(anyhow!("No form_token"))?;
+        let res = self
+            .client
+            .post(self.download_path())
+            .query(&[("t", id)])
+            .form(&["form_token", &form_token])
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        Ok(res)
     }
 }

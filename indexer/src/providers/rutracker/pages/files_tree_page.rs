@@ -43,19 +43,19 @@ fn map_tree(el: ElementRef) -> Vec<FileOrDir> {
 }
 
 #[derive(Debug)]
-enum FileOrDir {
+pub enum FileOrDir {
     File(File),
     Dir(Dir),
 }
 
 #[derive(Debug)]
-struct File {
+pub struct File {
     name: String,
     size: (i64, String),
 }
 
 #[derive(Debug)]
-struct Dir {
+pub struct Dir {
     name: String,
     contents: Vec<FileOrDir>,
 }

@@ -22,6 +22,7 @@ async fn main() -> anyhow::Result<()> {
         login_path: env::var("RUTRACKER_LOGIN_PATH")?,
         search_path: env::var("RUTRACKER_SEARCH_PATH")?,
         index_path: env::var("RUTRACKER_INDEX_PATH")?,
+        topic_path: env::var("RUTRACKER_TOPIC_PATH")?,
         provider_id: "rutracker".to_string(),
     };
 

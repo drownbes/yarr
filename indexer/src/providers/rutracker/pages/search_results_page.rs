@@ -59,6 +59,10 @@ impl SearchResultPage {
             })
             .collect()
     }
+
+    pub fn get_topic_files(&self, id: i64) -> Option<()> {
+        Some(())
+    }
 }
 
 #[derive(Debug)]
@@ -86,6 +90,10 @@ impl<'a> SelectUtils<'a> for ResultRow<'a> {
 impl<'a> ResultRow<'a> {
     fn new(el: ElementRef<'a>) -> ResultRow<'a> {
         ResultRow { el }
+    }
+
+    pub fn get_id(&self) -> Option<i64> {
+        self.el.value().attr("data-topic_id")?.parse().ok()
     }
 
     pub fn get_topic(&self) -> Option<String> {
@@ -148,6 +156,7 @@ mod tests {
         let nd = SearchResultPage::new(&html_str);
         let rows = nd.get_search_result_rows();
         let fr = rows.first().unwrap();
+        dbg!(fr.get_id().unwrap());
         dbg!(fr.get_topic().unwrap());
         dbg!(fr.get_link());
         dbg!(fr.get_size());
