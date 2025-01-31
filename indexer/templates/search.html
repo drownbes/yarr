@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<form hx-post="/search" hx-target="#result">
+      <input type="text" name="text">
+      <button type="submit">Search</button>
+</form>
+<div id="result">
+</div>
+{% endblock %}
+
