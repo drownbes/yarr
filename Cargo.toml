@@ -1,6 +1,5 @@
 [workspace]
 members = [ 
   "indexer",
-  "server",
 ]
 resolver = "2"

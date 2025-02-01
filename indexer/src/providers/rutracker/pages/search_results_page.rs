@@ -121,6 +121,15 @@ impl<'a> ResultRow<'a> {
     pub fn get_leechers(&self) -> Option<i64> {
         self.get_number("td .leechmed")
     }
+
+    pub fn get_category(&self) -> Option<(i64, String)> {
+        let ct = self.el.select(&Selector::parse("td.f-name-col a").unwrap()).next()?;
+        let text = ct.text().next()?.to_owned();
+        let href = ct.value().attr("href")?.to_owned();
+        let re = regex::Regex::new(r#"f=(.+)$"#).unwrap();
+        let id : i64 = re.captures(&href)?.get(1)?.as_str().parse().ok()?;
+        Some((id, text))
+    }
 }
 
 #[cfg(test)]
@@ -128,6 +137,14 @@ mod tests {
     use crate::providers::rutracker::test_helpers;
 
     use super::*;
+    
+    #[test]
+    fn test_category_regex() {
+        let href = "tracker.php?f=1449";
+        let re = regex::Regex::new(r#"f=(.+)$"#).unwrap();
+        let id  : i64= re.captures(href).unwrap().get(1).unwrap().as_str().parse().unwrap();
+        dbg!(id);
+    }
 
     fn read_fixture() -> String {
         test_helpers::read_fixture("./fixtures/search_page.html")

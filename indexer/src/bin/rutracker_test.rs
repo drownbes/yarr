@@ -1,12 +1,16 @@
 use std::env;
 use std::sync::Arc;
+use std::time::Duration;
 
+use indexer::logs::init_tracing;
 use indexer::providers::rutracker::client::{RuTrackerClient, RuTrackerConfig};
 use indexer::repos::create_sqlite_pool;
 use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    init_tracing();
+
     dotenvy::from_filename(".env.local")?;
 
     let pool = create_sqlite_pool("sqlite://db.db").await?;
@@ -19,11 +23,8 @@ async fn main() -> anyhow::Result<()> {
         login: env::var("RUTRACKER_LOGIN")?.into(),
         password: env::var("RUTRACKER_PASSWORD")?.into(),
         base_url: env::var("RUTRACKER_BASEURL")?,
-        login_path: env::var("RUTRACKER_LOGIN_PATH")?,
-        search_path: env::var("RUTRACKER_SEARCH_PATH")?,
-        index_path: env::var("RUTRACKER_INDEX_PATH")?,
-        topic_path: env::var("RUTRACKER_TOPIC_PATH")?,
         provider_id: "rutracker".to_string(),
+        timeout: Duration::from_secs(30),
     };
 
     let mut rt = RuTrackerClient::new(rt_config, cookie_repo).await?;
@@ -34,7 +35,9 @@ async fn main() -> anyhow::Result<()> {
         println!("Logged in");
     }
 
-    rt.search("Game of thrones".into(), vec![]).await?;
+    let res = rt.search("Game of thrones".into(), vec![]).await?;
+
+    dbg!(res);
 
     Ok(())
 }

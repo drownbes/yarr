@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use reqwest_cookie_store::CookieStoreMutex;
 use secrecy::{ExposeSecret, SecretString};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tracing::info;
 
@@ -16,14 +16,11 @@ use super::pages::{
 };
 
 pub struct RuTrackerConfig {
+    pub provider_id: String,
     pub login: SecretString,
     pub password: SecretString,
     pub base_url: String,
-    pub login_path: String,
-    pub search_path: String,
-    pub index_path: String,
-    pub provider_id: String,
-    pub topic_path: String,
+    pub timeout: Duration
 }
 
 pub struct RuTrackerClient {
@@ -31,7 +28,7 @@ pub struct RuTrackerClient {
     client: reqwest::Client,
     config: RuTrackerConfig,
     cookie_repo: Arc<Mutex<CookiesRepo>>,
-    form_token: Option<String>,
+    form_token: Arc<Mutex<Option<String>>>,
 }
 
 #[derive(serde::Serialize, Debug)]
@@ -39,6 +36,17 @@ struct LoginReq {
     login_username: String,
     login_password: String,
     login: String,
+}
+
+#[derive(Debug)]
+pub struct SearchResult {
+    id: i64,
+    topic: String,
+    link: String,
+    size: (String, String),
+    category:(i64, String),
+    seeders: i64,
+    leechers: i64
 }
 
 impl RuTrackerClient {
@@ -63,6 +71,7 @@ impl RuTrackerClient {
         let cookie_store = std::sync::Arc::new(CookieStoreMutex::new(cookie_store));
 
         let client = reqwest::ClientBuilder::new()
+            .timeout(config.timeout)
             .cookie_provider(cookie_store.clone())
             .build()?;
         Ok(RuTrackerClient {
@@ -70,16 +79,12 @@ impl RuTrackerClient {
             cookie_store,
             client,
             config,
-            form_token: None,
+            form_token: Arc::new(Mutex::new(None)),
         })
     }
 
     pub async fn is_session_active(&self) -> anyhow::Result<bool> {
         let store = self.cookie_store.lock().unwrap();
-        for c in store.iter_any() {
-            println!("{:?}", c);
-        }
-
         let session_cookie = store.get("rutracker.net", "/forum/", "bb_session");
         Ok(session_cookie.is_some())
     }
@@ -96,18 +101,18 @@ impl RuTrackerClient {
     }
 
     fn login_path(&self) -> String {
-        format!("{}{}", self.config.base_url, self.config.login_path)
+        format!("{}{}", self.config.base_url, "/forum/login.php")
     }
 
     fn search_path(&self) -> String {
-        format!("{}{}", self.config.base_url, self.config.search_path)
+        format!("{}{}", self.config.base_url, "/forum/tracker.php")
     }
     fn index_path(&self) -> String {
-        format!("{}{}", self.config.base_url, self.config.index_path)
+        format!("{}{}", self.config.base_url, "/forum/index.php")
     }
 
     fn topic_path(&self) -> String {
-        format!("{}{}", self.config.base_url, self.config.topic_path)
+        format!("{}{}", self.config.base_url, "/forum/viewtopic.php")
     }
 
     fn download_path(&self) -> String {
@@ -141,23 +146,33 @@ impl RuTrackerClient {
             login_password: self.config.password.expose_secret().to_string(),
             login: "вход".to_string(),
         };
-        let _res = self
+        let page = self
             .client
             .post(self.login_path())
             .form(&req)
             .send()
+            .await?
+            .text()
             .await?;
 
-        self.persist_cookies().await?;
-
-        Ok(())
+        let ip = IndexPage::new(&page);
+        if ip.is_logged()? {
+            info!("Logged in");
+            let form_token = ip.get_form_token().ok_or(anyhow!("No form token"))?;
+            info!("Got form token");
+            *self.form_token.lock().await = Some(form_token);
+            self.persist_cookies().await?;
+            Ok(())
+        } else {
+            Err(anyhow!("Failed to log in"))
+        }
     }
 
     pub fn prepend_base_url(&self, path: &str) -> String {
         format!("{}/forum/{}", self.config.base_url, path)
     }
 
-    pub async fn search(&self, query: String, categories: Vec<u64>) -> anyhow::Result<()> {
+    pub async fn search(&self, query: String, categories: Vec<u64>) -> anyhow::Result<Vec<SearchResult>> {
         let cs: String = categories
             .iter()
             .map(|x| x.to_string())
@@ -188,11 +203,23 @@ impl RuTrackerClient {
             let p = SearchResultPage::new(&html);
             next_url = p.get_next_page_href().map(|u| self.prepend_base_url(&u));
             pages.push(p);
-
             info!("Got {} page of search results", pages.len());
         }
 
-        Ok(())
+        let rows : Vec<SearchResult> = pages.iter()
+            .flat_map(|p| p.get_search_result_rows())
+            .flat_map(|r| Some(SearchResult {
+                id: r.get_id()?,
+                topic: r.get_topic()?,
+                link: r.get_link()?,
+                size: r.get_size()?,
+                category: r.get_category()?,
+                seeders: r.get_seeders()?,
+                leechers: r.get_leechers()?
+            }))
+            .collect();
+
+        Ok(rows)
     }
 
     pub async fn topic_files(&self, id: i64) -> anyhow::Result<Option<Vec<FileOrDir>>> {
@@ -211,7 +238,9 @@ impl RuTrackerClient {
     }
 
     pub async fn torrent_file(&self, id: i64) -> anyhow::Result<String> {
-        let form_token = self.form_token.clone().ok_or(anyhow!("No form_token"))?;
+        let form_token = { 
+            self.form_token.lock().await.clone().ok_or(anyhow!("No form_token"))?
+        };
         let res = self
             .client
             .post(self.download_path())
@@ -221,7 +250,6 @@ impl RuTrackerClient {
             .await?
             .text()
             .await?;
-
         Ok(res)
     }
 }

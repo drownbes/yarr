@@ -9,7 +9,7 @@ use search_results::SearchResults;
 
 pub struct CategoriesResult;
 
-trait Provider: Send + Sync + 'static {
+pub trait Provider: Send + Sync + 'static {
     fn search(&self) -> impl Future<Output = anyhow::Result<SearchResults>>;
     fn categories(&self) -> impl Future<Output = anyhow::Result<CategoriesResult>>;
 }
